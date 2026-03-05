@@ -4,7 +4,7 @@ import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } from 'mediabunny';
 import Hls from 'hls.js';
 import coreJsUrl from '../vendor/ffmpeg-core.js?url';
 import coreWasmUrl from '../vendor/ffmpeg-core.wasm?url';
-import classWorkerUrl from '../vendor/worker.js?url';
+// classWorkerURL served from public/ (not blob URL) so its relative imports resolve
 
 const $ = id => document.getElementById(id);
 const status = msg => $('status').textContent = msg;
@@ -51,7 +51,7 @@ try {
   await ffmpeg.load({
     coreURL: await toBlobURL(coreJsUrl, 'text/javascript'),
     wasmURL: await toBlobURL(coreWasmUrl, 'application/wasm'),
-    classWorkerURL: await toBlobURL(classWorkerUrl, 'text/javascript'),
+    classWorkerURL: new URL('./ffmpeg-worker/worker.js', window.location.href).href,
   });
 } catch (e) {
   log(`ffmpeg.load failed: ${e.message}`, 'r');

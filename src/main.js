@@ -146,9 +146,10 @@ function generatePlaylist(segs) {
 // ─── 6. Handle on-demand segment requests from service worker ───
 async function generateSegment(seg) {
   const out = `/tmp_${Date.now()}.ts`;
+  // -ss after -i (output seeking) — input seeking is broken with WORKERFS
   const baseArgs = [
-    '-ss', seg.startSec.toFixed(6),
     '-i', inputPath,
+    '-ss', seg.startSec.toFixed(6),
     '-t', seg.durationSec.toFixed(6),
   ];
   const muxArgs = ['-copyts', '-avoid_negative_ts', 'make_zero', '-f', 'mpegts', '-v', 'warning', out];

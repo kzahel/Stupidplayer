@@ -67,6 +67,7 @@ status('Ready — pick a video file');
 // ─── State ───
 let inputPath = null;
 let segmentPlan = [];
+let audioCodecArgs = ['-c:a', 'copy'];
 let opQueue = Promise.resolve();
 
 function runSerialized(fn) {
@@ -101,7 +102,14 @@ async function getKeyframeIndex(file) {
       packet = next;
     }
     if (!keyframes.length) throw new Error('No keyframes found');
-    return { keyframes, duration };
+
+    let audioCodec = null;
+    try {
+      const audioTrack = await input.getPrimaryAudioTrack();
+      if (audioTrack) audioCodec = audioTrack.codec;
+    } catch {}
+
+    return { keyframes, duration, audioCodec };
   } finally {
     input.dispose();
   }
@@ -156,7 +164,8 @@ navigator.serviceWorker.addEventListener('message', async e => {
         '-ss', seg.startSec.toFixed(6),
         '-i', inputPath,
         '-t', seg.durationSec.toFixed(6),
-        '-c', 'copy',
+        '-c:v', 'copy',
+        ...audioCodecArgs,
         '-copyts',
         '-avoid_negative_ts', 'make_zero',
         '-f', 'mpegts',
@@ -187,9 +196,17 @@ $('file').addEventListener('change', async e => {
   try {
     status('Reading keyframe index...');
     const t0 = performance.now();
-    const { keyframes, duration } = await getKeyframeIndex(file);
+    const { keyframes, duration, audioCodec } = await getKeyframeIndex(file);
     const probeMs = (performance.now() - t0).toFixed(0);
-    log(`${keyframes.length} keyframes, ${duration.toFixed(1)}s duration (parsed in ${probeMs}ms)`, 'g');
+    log(`${keyframes.length} keyframes, ${duration.toFixed(1)}s duration, audio: ${audioCodec ?? 'none'} (parsed in ${probeMs}ms)`, 'g');
+
+    const HLS_SAFE_AUDIO = ['aac', 'mp3'];
+    if (audioCodec && !HLS_SAFE_AUDIO.includes(audioCodec)) {
+      audioCodecArgs = ['-c:a', 'aac', '-ac', '2'];
+      log(`Audio codec "${audioCodec}" not HLS-safe, will transcode to AAC`, 'y');
+    } else {
+      audioCodecArgs = ['-c:a', 'copy'];
+    }
 
     segmentPlan = buildSegmentPlan(keyframes, duration);
     log(`${segmentPlan.length} segments planned (~4s each)`, 'g');

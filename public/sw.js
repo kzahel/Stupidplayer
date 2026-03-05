@@ -58,22 +58,28 @@ async function getSegment(sessionId, uri) {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  const idx = url.pathname.indexOf(PREFIX);
 
-  // Inject COOP/COEP headers for cross-origin isolation (needed for SharedArrayBuffer / ffmpeg.wasm)
-  if (e.request.mode === 'navigate') {
+  // For non-stupidplay requests: inject COOP/COEP headers for cross-origin isolation
+  if (idx === -1) {
+    if (e.request.cache === 'only-if-cached' && e.request.mode !== 'same-origin') return;
     e.respondWith(
-      fetch(e.request, { cache: 'no-cache' }).then(r => {
+      fetch(e.request).then(r => {
+        if (r.status === 0) return r; // opaque response, can't modify
         const headers = new Headers(r.headers);
-        headers.set('Cross-Origin-Opener-Policy', 'same-origin');
         headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+        if (e.request.mode === 'navigate') {
+          headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+          headers.set('Cache-Control', 'no-cache');
+        }
         return new Response(r.body, { status: r.status, statusText: r.statusText, headers });
+      }).catch(err => {
+        if (e.request.mode === 'navigate') throw err;
+        return fetch(e.request); // fallback for non-navigations
       })
     );
     return;
   }
-
-  const idx = url.pathname.indexOf(PREFIX);
-  if (idx === -1) return;
 
   const rest = url.pathname.slice(idx + PREFIX.length);
   const slash = rest.indexOf('/');

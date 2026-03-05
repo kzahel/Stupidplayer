@@ -27,12 +27,18 @@ log('Service worker ready', 'g');
 // GitHub Pages doesn't send COOP/COEP headers; the service worker injects them.
 // On first visit the SW isn't active yet, so we reload once after it takes control.
 if (!crossOriginIsolated) {
-  log('Not cross-origin isolated — reloading...', 'y');
-  status('Enabling cross-origin isolation...');
-  location.reload();
-  await new Promise(() => {}); // halt execution
+  const reloaded = sessionStorage.getItem('coi-reload');
+  if (!reloaded) {
+    sessionStorage.setItem('coi-reload', '1');
+    log('Not cross-origin isolated — reloading...', 'y');
+    status('Enabling cross-origin isolation...');
+    location.reload();
+    await new Promise(() => {}); // halt execution
+  }
+  log('Warning: not cross-origin isolated after reload', 'r');
 }
-log('Cross-origin isolated', 'g');
+sessionStorage.removeItem('coi-reload');
+log(`Cross-origin isolated: ${crossOriginIsolated}`, crossOriginIsolated ? 'g' : 'y');
 
 // ─── 2. Load ffmpeg.wasm ───
 const ffmpeg = new FFmpeg();

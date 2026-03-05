@@ -189,7 +189,58 @@ async function runBenchmark() {
   ];
 
   log('\n═══ BENCHMARK START ═══', 'y');
-  log(`Testing ${segs.length} segment(s), ${strategies.length} strategies each`, 'y');
+
+  // 0. Bare exec overhead — no I/O at all
+  log('\n── exec() overhead (no I/O) ──', 'y');
+  {
+    const t0 = performance.now();
+    await ffmpeg.exec(['-version']);
+    log(`  -version: ${(performance.now() - t0).toFixed(0)}ms`, 'g');
+  }
+  {
+    const t0 = performance.now();
+    await ffmpeg.exec(['-f', 'lavfi', '-i', 'nullsrc=s=2x2:d=0.001', '-f', 'null', '-']);
+    log(`  null encode (1 frame): ${(performance.now() - t0).toFixed(0)}ms`, 'g');
+  }
+
+  // 1. Tiny segment (0.1s) vs full segment — does time scale with duration?
+  log('\n── duration scaling (video-only) ──', 'y');
+  for (const dur of [0.1, 1, segmentPlan[0].durationSec]) {
+    const out = `/bench_ds_${Date.now()}.ts`;
+    const t0 = performance.now();
+    await ffmpeg.exec([
+      '-ss', '0', '-i', inputPath, '-t', dur.toFixed(6),
+      '-c:v', 'copy', '-an', '-avoid_negative_ts', 'make_zero',
+      '-f', 'mpegts', '-v', 'warning', out,
+    ]);
+    const execMs = (performance.now() - t0).toFixed(0);
+    let data;
+    try { data = await ffmpeg.readFile(out); } catch { data = new Uint8Array(0); }
+    try { await ffmpeg.deleteFile(out); } catch {}
+    const kb = (data.byteLength / 1024).toFixed(0);
+    log(`  ${dur.toFixed(1)}s → ${execMs}ms  ${kb}KB`, data.byteLength > 0 ? 'g' : 'r');
+  }
+
+  // 2. Seek position scaling — does later position take longer?
+  log('\n── seek position scaling (video-only, 1s segments) ──', 'y');
+  const positions = [0, 30, 60, 120, 300].filter(p => p < segmentPlan[segmentPlan.length - 1].startSec + segmentPlan[segmentPlan.length - 1].durationSec);
+  for (const pos of positions) {
+    const out = `/bench_sp_${Date.now()}.ts`;
+    const t0 = performance.now();
+    await ffmpeg.exec([
+      '-ss', pos.toFixed(6), '-i', inputPath, '-t', '1.000000',
+      '-c:v', 'copy', '-an', '-avoid_negative_ts', 'make_zero',
+      '-f', 'mpegts', '-v', 'warning', out,
+    ]);
+    const execMs = (performance.now() - t0).toFixed(0);
+    let data;
+    try { data = await ffmpeg.readFile(out); } catch { data = new Uint8Array(0); }
+    try { await ffmpeg.deleteFile(out); } catch {}
+    const kb = (data.byteLength / 1024).toFixed(0);
+    log(`  @${pos}s → ${execMs}ms  ${kb}KB`, data.byteLength > 0 ? 'g' : 'r');
+  }
+
+  log(`\nTesting ${segs.length} segment(s), ${strategies.length} strategies each`, 'y');
 
   for (const seg of segs) {
     log(`\n── ${seg.uri}: ${seg.durationSec.toFixed(1)}s @ ${seg.startSec.toFixed(1)}s ──`, 'y');

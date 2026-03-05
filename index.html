@@ -91,6 +91,8 @@
     const coreURL = await cachedBlobURL(`${CORE_CDN}/ffmpeg-core.js`, 'text/javascript');
     const wasmURL = await cachedBlobURL(`${CORE_CDN}/ffmpeg-core.wasm`, 'application/wasm');
     const classWorkerURL = await cachedBlobURL(`${FFMPEG_CDN}/worker.js`, 'text/javascript');
+    const t0 = performance.now();
+    const tick = setInterval(() => status(`Compiling wasm... ${((performance.now() - t0) / 1000).toFixed(0)}s`), 500);
     status('Compiling wasm...');
     try {
       await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
@@ -98,6 +100,8 @@
       log(`ffmpeg.load failed: ${e.message}`, 'r');
       status('ffmpeg.wasm failed to load — check log');
       throw e;
+    } finally {
+      clearInterval(tick);
     }
     log('ffmpeg.wasm ready', 'g');
     status('Ready — pick a video file');

@@ -12,6 +12,9 @@
     #top p { color: #777; font-size: 13px; margin-bottom: 16px; line-height: 1.4; }
     #pick { display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: 600; color: #fff; background: #2a6; border: none; border-radius: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
     #pick:active { background: #185; }
+    #bench { display: none; padding: 10px 20px; font-size: 14px; font-weight: 600; color: #fff; background: #c60; border: none; border-radius: 8px; cursor: pointer; margin-left: 10px; }
+    #bench:active { background: #a40; }
+    #bench:disabled { opacity: 0.5; cursor: not-allowed; }
     #file { display: none; }
     #status { display: block; margin-top: 12px; font-size: 14px; font-family: monospace; min-height: 1.5em; }
     video { flex: 1; min-height: 0; width: 100%; background: #000; }
@@ -24,6 +27,7 @@
     <h1>Stupid Play</h1>
     <p>Pick a video file. Keyframes are indexed in-browser, then ffmpeg.wasm remuxes segments on demand via a service worker for HLS playback.</p>
     <button id="pick" onclick="document.getElementById('file').click()">Choose Video</button>
+    <button id="bench">Benchmark</button>
     <input type="file" id="file" accept=".mp4,.mkv,.mov,.m4v,.webm,.ts,.avi,.wmv,.flv,.mpg,.mpeg,.m2ts,.mts,.vob,.3gp,.ogv,.mp3,.m4a,.aac,.ogg,.opus,.flac,.wav,.wma">
     <div id="status" class="y"></div>
   </div>

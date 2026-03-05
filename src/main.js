@@ -174,6 +174,102 @@ async function generateSegment(seg) {
   throw new Error(`ffmpeg produced empty output (exit ${code})`);
 }
 
+// ─── Benchmark ───
+async function runBenchmark() {
+  if (!inputPath || !segmentPlan.length) {
+    log('Benchmark: load a file first', 'r');
+    return;
+  }
+
+  const segs = segmentPlan.slice(0, 3); // test first 3 segments
+  const strategies = [
+    { name: 'video-only (-an)', audio: ['-an'] },
+    { name: 'copy (v+a copy)', audio: ['-c:a', 'copy'] },
+    { name: 'transcode (v copy, a→aac)', audio: ['-c:a', 'aac', '-ac', '2'] },
+  ];
+
+  log('\n═══ BENCHMARK START ═══', 'y');
+  log(`Testing ${segs.length} segment(s), ${strategies.length} strategies each`, 'y');
+
+  for (const seg of segs) {
+    log(`\n── ${seg.uri}: ${seg.durationSec.toFixed(1)}s @ ${seg.startSec.toFixed(1)}s ──`, 'y');
+
+    for (const strat of strategies) {
+      const out = `/bench_${Date.now()}.ts`;
+      const args = [
+        '-ss', seg.startSec.toFixed(6),
+        '-i', inputPath,
+        '-t', seg.durationSec.toFixed(6),
+        '-c:v', 'copy', ...strat.audio,
+        '-avoid_negative_ts', 'make_zero', '-f', 'mpegts', '-v', 'warning', out,
+      ];
+
+      const t0 = performance.now();
+      const code = await ffmpeg.exec(args);
+      const tExec = performance.now();
+
+      let data;
+      try { data = await ffmpeg.readFile(out); } catch { data = new Uint8Array(0); }
+      const tRead = performance.now();
+
+      try { await ffmpeg.deleteFile(out); } catch {}
+      const tDel = performance.now();
+
+      const execMs = (tExec - t0).toFixed(0);
+      const readMs = (tRead - tExec).toFixed(0);
+      const delMs = (tDel - tRead).toFixed(0);
+      const totalMs = (tDel - t0).toFixed(0);
+      const kb = (data.byteLength / 1024).toFixed(0);
+      const ratio = seg.durationSec > 0 ? ((tExec - t0) / 1000 / seg.durationSec).toFixed(2) : '?';
+
+      const ok = data.byteLength > 0;
+      log(
+        `  ${strat.name}: ${ok ? totalMs + 'ms' : 'FAILED (exit ' + code + ')'}` +
+        (ok ? `  exec=${execMs}ms read=${readMs}ms del=${delMs}ms  ${kb}KB  ${ratio}x realtime` : ''),
+        ok ? 'g' : 'r',
+      );
+    }
+  }
+
+  // Also benchmark audio-only extraction (no video at all)
+  log('\n── audio-only extraction (no video) ──', 'y');
+  const seg0 = segs[0];
+  for (const strat of [
+    { name: 'audio copy', audio: ['-c:a', 'copy'] },
+    { name: 'audio→aac', audio: ['-c:a', 'aac', '-ac', '2'] },
+  ]) {
+    const out = `/bench_a_${Date.now()}.ts`;
+    const args = [
+      '-ss', seg0.startSec.toFixed(6),
+      '-i', inputPath,
+      '-t', seg0.durationSec.toFixed(6),
+      '-vn', ...strat.audio,
+      '-f', 'mpegts', '-v', 'warning', out,
+    ];
+    const t0 = performance.now();
+    const code = await ffmpeg.exec(args);
+    const tExec = performance.now();
+    let data;
+    try { data = await ffmpeg.readFile(out); } catch { data = new Uint8Array(0); }
+    const tRead = performance.now();
+    try { await ffmpeg.deleteFile(out); } catch {}
+    const tDel = performance.now();
+
+    const execMs = (tExec - t0).toFixed(0);
+    const totalMs = (tDel - t0).toFixed(0);
+    const kb = (data.byteLength / 1024).toFixed(0);
+    const ratio = seg0.durationSec > 0 ? ((tExec - t0) / 1000 / seg0.durationSec).toFixed(2) : '?';
+    const ok = data.byteLength > 0;
+    log(
+      `  ${strat.name}: ${ok ? totalMs + 'ms' : 'FAILED (exit ' + code + ')'}` +
+      (ok ? `  exec=${execMs}ms read=${(tRead - tExec).toFixed(0)}ms  ${kb}KB  ${ratio}x realtime` : ''),
+      ok ? 'g' : 'r',
+    );
+  }
+
+  log('\n═══ BENCHMARK DONE ═══\n', 'y');
+}
+
 navigator.serviceWorker.addEventListener('message', async e => {
   if (e.data?.type !== 'need-segment') return;
   const port = e.ports?.[0];
@@ -236,6 +332,16 @@ $('file').addEventListener('change', async e => {
     await ffmpeg.mount('WORKERFS', { files: [file] }, mountPoint);
     inputPath = `${mountPoint}/${file.name}`;
     log(`Mounted: ${inputPath}`, 'g');
+
+    // Show benchmark button
+    const benchBtn = $('bench');
+    benchBtn.style.display = 'inline-block';
+    benchBtn.onclick = async () => {
+      benchBtn.disabled = true;
+      benchBtn.textContent = 'Running...';
+      try { await runSerialized(() => runBenchmark()); }
+      finally { benchBtn.disabled = false; benchBtn.textContent = 'Benchmark'; }
+    };
 
     // Init service worker session
     const sessionId = `sp-${Date.now()}`;

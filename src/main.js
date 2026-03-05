@@ -144,6 +144,35 @@ function generatePlaylist(segs) {
 }
 
 // ─── 6. Handle on-demand segment requests from service worker ───
+async function generateSegment(seg) {
+  const out = `/tmp_${Date.now()}.ts`;
+  const baseArgs = [
+    '-ss', seg.startSec.toFixed(6),
+    '-i', inputPath,
+    '-t', seg.durationSec.toFixed(6),
+  ];
+  const muxArgs = ['-copyts', '-avoid_negative_ts', 'make_zero', '-f', 'mpegts', '-v', 'warning', out];
+
+  // Strategy 1: video copy + audio (copy or transcode)
+  let code = await ffmpeg.exec([...baseArgs, '-c:v', 'copy', ...audioCodecArgs, ...muxArgs]);
+  let data;
+  try { data = await ffmpeg.readFile(out); } catch { data = new Uint8Array(0); }
+  try { await ffmpeg.deleteFile(out); } catch {}
+
+  if (data.byteLength > 0) return data;
+
+  // Strategy 2: video-only (audio codec might not be supported)
+  log(`Retrying ${seg.uri} without audio`, 'y');
+  audioCodecArgs = ['-an']; // switch for all future segments too
+  code = await ffmpeg.exec([...baseArgs, '-c:v', 'copy', '-an', ...muxArgs]);
+  try { data = await ffmpeg.readFile(out); } catch { data = new Uint8Array(0); }
+  try { await ffmpeg.deleteFile(out); } catch {}
+
+  if (data.byteLength > 0) return data;
+
+  throw new Error(`ffmpeg produced empty output (exit ${code})`);
+}
+
 navigator.serviceWorker.addEventListener('message', async e => {
   if (e.data?.type !== 'need-segment') return;
   const port = e.ports?.[0];
@@ -158,29 +187,12 @@ navigator.serviceWorker.addEventListener('message', async e => {
 
   try {
     const t0 = performance.now();
-    const raw = await runSerialized(async () => {
-      const out = `/tmp_${Date.now()}.ts`;
-      const code = await ffmpeg.exec([
-        '-ss', seg.startSec.toFixed(6),
-        '-i', inputPath,
-        '-t', seg.durationSec.toFixed(6),
-        '-c:v', 'copy',
-        ...audioCodecArgs,
-        '-copyts',
-        '-avoid_negative_ts', 'make_zero',
-        '-f', 'mpegts',
-        '-v', 'error',
-        out,
-      ]);
-      if (code !== 0) throw new Error(`ffmpeg exit ${code}`);
-      const data = await ffmpeg.readFile(out);
-      try { await ffmpeg.deleteFile(out); } catch {}
-      return data;
-    });
+    const raw = await runSerialized(() => generateSegment(seg));
     const ms = (performance.now() - t0).toFixed(0);
     const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);
+    const kb = (buf.byteLength / 1024).toFixed(0);
     port.postMessage({ data: buf, contentType: 'video/mp2t' }, [buf]);
-    log(`${uri} → ${(buf.byteLength / 1024).toFixed(0)} KB in ${ms}ms`, 'g');
+    log(`${uri} → ${kb} KB in ${ms}ms`, 'g');
   } catch (err) {
     log(`${uri} failed: ${err.message}`, 'r');
     port.postMessage({ error: err.message });
@@ -212,7 +224,7 @@ $('file').addEventListener('change', async e => {
     // Use larger segments when transcoding to reduce overhead
     const segTarget = needsTranscode ? 10 : 4;
     segmentPlan = buildSegmentPlan(keyframes, duration, segTarget);
-    log(`${segmentPlan.length} segments planned (~4s each)`, 'g');
+    log(`${segmentPlan.length} segments planned (~${segTarget}s each)`, 'g');
 
     const playlist = generatePlaylist(segmentPlan);
 

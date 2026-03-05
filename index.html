@@ -85,12 +85,14 @@
     }
 
     const ffmpeg = new FFmpeg();
-    const CDN = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm';
-    const coreURL = await cachedBlobURL(`${CDN}/ffmpeg-core.js`, 'text/javascript');
-    const wasmURL = await cachedBlobURL(`${CDN}/ffmpeg-core.wasm`, 'application/wasm');
+    const CORE_CDN = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm';
+    const FFMPEG_CDN = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/esm';
+    const coreURL = await cachedBlobURL(`${CORE_CDN}/ffmpeg-core.js`, 'text/javascript');
+    const wasmURL = await cachedBlobURL(`${CORE_CDN}/ffmpeg-core.wasm`, 'application/wasm');
+    const workerURL = await cachedBlobURL(`${FFMPEG_CDN}/worker.js`, 'text/javascript');
     status('Compiling wasm...');
     try {
-      await ffmpeg.load({ coreURL, wasmURL });
+      await ffmpeg.load({ coreURL, wasmURL, workerURL });
     } catch (e) {
       log(`ffmpeg.load failed: ${e.message}`, 'r');
       status('ffmpeg.wasm failed to load — check log');

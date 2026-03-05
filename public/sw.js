@@ -1,6 +1,6 @@
 // Stupid Play service worker — intercepts HLS requests and serves from wasm FS via main page
 const PREFIX = '/__stupidplay__/';
-const TIMEOUT_MS = 30000;
+const TIMEOUT_MS = 120000;
 const sessions = new Map();
 
 self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));

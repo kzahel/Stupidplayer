@@ -201,14 +201,17 @@ $('file').addEventListener('change', async e => {
     log(`${keyframes.length} keyframes, ${duration.toFixed(1)}s duration, audio: ${audioCodec ?? 'none'} (parsed in ${probeMs}ms)`, 'g');
 
     const HLS_SAFE_AUDIO = ['aac', 'mp3'];
-    if (audioCodec && !HLS_SAFE_AUDIO.includes(audioCodec)) {
+    const needsTranscode = audioCodec && !HLS_SAFE_AUDIO.includes(audioCodec);
+    if (needsTranscode) {
       audioCodecArgs = ['-c:a', 'aac', '-ac', '2'];
       log(`Audio codec "${audioCodec}" not HLS-safe, will transcode to AAC`, 'y');
     } else {
       audioCodecArgs = ['-c:a', 'copy'];
     }
 
-    segmentPlan = buildSegmentPlan(keyframes, duration);
+    // Use larger segments when transcoding to reduce overhead
+    const segTarget = needsTranscode ? 10 : 4;
+    segmentPlan = buildSegmentPlan(keyframes, duration, segTarget);
     log(`${segmentPlan.length} segments planned (~4s each)`, 'g');
 
     const playlist = generatePlaylist(segmentPlan);
@@ -233,7 +236,18 @@ $('file').addEventListener('change', async e => {
     video.style.display = 'block';
 
     if (Hls.isSupported()) {
-      const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+      const hls = new Hls({
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        fragLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 60000,
+            maxLoadTimeMs: 120000,
+            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 4000 },
+            errorRetry: { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+          },
+        },
+      });
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); status('Playing'); });

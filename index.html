@@ -84,14 +84,19 @@
       return URL.createObjectURL(blob);
     }
 
-    status('Loading ffmpeg.wasm...');
     const ffmpeg = new FFmpeg();
     const CDN = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm';
-    await ffmpeg.load({
-      coreURL: await cachedBlobURL(`${CDN}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await cachedBlobURL(`${CDN}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-    log('ffmpeg.wasm loaded (cached for next time)', 'g');
+    const coreURL = await cachedBlobURL(`${CDN}/ffmpeg-core.js`, 'text/javascript');
+    const wasmURL = await cachedBlobURL(`${CDN}/ffmpeg-core.wasm`, 'application/wasm');
+    status('Compiling wasm...');
+    try {
+      await ffmpeg.load({ coreURL, wasmURL });
+    } catch (e) {
+      log(`ffmpeg.load failed: ${e.message}`, 'r');
+      status('ffmpeg.wasm failed to load — check log');
+      throw e;
+    }
+    log('ffmpeg.wasm ready', 'g');
     status('Ready — pick a video file');
 
     // ─── State ───

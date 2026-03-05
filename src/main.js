@@ -146,13 +146,13 @@ function generatePlaylist(segs) {
 // ─── 6. Handle on-demand segment requests from service worker ───
 async function generateSegment(seg) {
   const out = `/tmp_${Date.now()}.ts`;
-  // -ss after -i (output seeking) — input seeking is broken with WORKERFS
+  // -ss before -i (input seeking) is fast but needs no -copyts to work with WORKERFS
   const baseArgs = [
-    '-i', inputPath,
     '-ss', seg.startSec.toFixed(6),
+    '-i', inputPath,
     '-t', seg.durationSec.toFixed(6),
   ];
-  const muxArgs = ['-copyts', '-avoid_negative_ts', 'make_zero', '-f', 'mpegts', '-v', 'warning', out];
+  const muxArgs = ['-avoid_negative_ts', 'make_zero', '-f', 'mpegts', '-v', 'warning', out];
 
   // Strategy 1: video copy + audio (copy or transcode)
   let code = await ffmpeg.exec([...baseArgs, '-c:v', 'copy', ...audioCodecArgs, ...muxArgs]);

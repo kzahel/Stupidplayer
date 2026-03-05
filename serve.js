@@ -16,6 +16,7 @@ http.createServer((req, res) => {
   // Required for SharedArrayBuffer (ffmpeg.wasm)
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+  res.setHeader('Cache-Control', 'no-cache');
 
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }

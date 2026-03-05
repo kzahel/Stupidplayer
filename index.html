@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>Stupid Play</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -89,10 +90,10 @@
     const FFMPEG_CDN = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/esm';
     const coreURL = await cachedBlobURL(`${CORE_CDN}/ffmpeg-core.js`, 'text/javascript');
     const wasmURL = await cachedBlobURL(`${CORE_CDN}/ffmpeg-core.wasm`, 'application/wasm');
-    const workerURL = await cachedBlobURL(`${FFMPEG_CDN}/worker.js`, 'text/javascript');
+    const classWorkerURL = await cachedBlobURL(`${FFMPEG_CDN}/worker.js`, 'text/javascript');
     status('Compiling wasm...');
     try {
-      await ffmpeg.load({ coreURL, wasmURL, workerURL });
+      await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
     } catch (e) {
       log(`ffmpeg.load failed: ${e.message}`, 'r');
       status('ffmpeg.wasm failed to load — check log');

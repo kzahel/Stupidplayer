@@ -58,6 +58,13 @@ async function getSegment(sessionId, uri) {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Force no-cache for page navigations (index.html etc.)
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request, { cache: 'no-cache' }));
+    return;
+  }
+
   const idx = url.pathname.indexOf(PREFIX);
   if (idx === -1) return;
 

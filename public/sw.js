@@ -59,9 +59,16 @@ async function getSegment(sessionId, uri) {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Force no-cache for page navigations (index.html etc.)
+  // Inject COOP/COEP headers for cross-origin isolation (needed for SharedArrayBuffer / ffmpeg.wasm)
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request, { cache: 'no-cache' }));
+    e.respondWith(
+      fetch(e.request, { cache: 'no-cache' }).then(r => {
+        const headers = new Headers(r.headers);
+        headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+        headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+        return new Response(r.body, { status: r.status, statusText: r.statusText, headers });
+      })
+    );
     return;
   }
 

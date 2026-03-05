@@ -1,24 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Stupid Play</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #111; color: #ccc; font: 14px/1.4 monospace; display: flex; flex-direction: column; height: 100vh; }
-    #top { padding: 16px; text-align: center; }
-    #top h1 { font-size: 20px; margin-bottom: 8px; }
-    #top p { color: #888; font-size: 12px; margin-bottom: 12px; }
+    body { background: #111; color: #ccc; font: 14px/1.5 -apple-system, system-ui, sans-serif; display: flex; flex-direction: column; height: 100dvh; }
+    #top { padding: 20px 16px; text-align: center; }
+    #top h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+    #top p { color: #777; font-size: 13px; margin-bottom: 16px; line-height: 1.4; }
+    #pick { display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: 600; color: #fff; background: #2a6; border: none; border-radius: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #pick:active { background: #185; }
+    #file { display: none; }
+    #status { display: block; margin-top: 12px; font-size: 14px; font-family: monospace; min-height: 1.5em; }
     video { flex: 1; min-height: 0; width: 100%; background: #000; }
-    #log { padding: 8px; font-size: 11px; max-height: 20vh; overflow-y: auto; background: #0a0a0a; white-space: pre-wrap; word-break: break-all; }
+    #log { padding: 10px 12px; font: 11px/1.4 monospace; max-height: 20vh; overflow-y: auto; background: #0a0a0a; white-space: pre-wrap; word-break: break-all; }
     .g { color: #0f0; } .r { color: #f44; } .d { color: #555; } .y { color: #ff0; }
   </style>
 </head>
 <body>
   <div id="top">
     <h1>Stupid Play</h1>
-    <p>Pick a video → mediabunny reads keyframe index → ffmpeg.wasm remuxes segments on demand → service worker serves HLS → hls.js plays</p>
+    <p>Pick a video file. Keyframes are indexed in-browser, then ffmpeg.wasm remuxes segments on demand via a service worker for HLS playback.</p>
+    <button id="pick" onclick="document.getElementById('file').click()">Choose Video</button>
     <input type="file" id="file" accept="video/*,.mkv,.mp4,.mov,.m4v,.webm,.ts">
-    <span id="status" class="y"></span>
+    <div id="status" class="y"></div>
   </div>
   <video id="v" controls style="display:none"></video>
   <div id="log"></div>

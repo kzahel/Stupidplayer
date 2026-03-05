@@ -39,7 +39,7 @@
 
     // ─── 1. Service worker ───
     status('Registering service worker...');
-    await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.register('./sw.js');
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) {
       await new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }));
@@ -207,7 +207,7 @@
 
         // Play with hls.js
         status('Starting playback...');
-        const url = `/__stupidplay__/${sessionId}/playlist.m3u8`;
+        const url = `./__stupidplay__/${sessionId}/playlist.m3u8`;
         const video = $('v');
         video.style.display = 'block';
 

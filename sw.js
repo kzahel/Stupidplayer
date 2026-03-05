@@ -58,9 +58,10 @@ async function getSegment(sessionId, uri) {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (!url.pathname.startsWith(PREFIX)) return;
+  const idx = url.pathname.indexOf(PREFIX);
+  if (idx === -1) return;
 
-  const rest = url.pathname.slice(PREFIX.length);
+  const rest = url.pathname.slice(idx + PREFIX.length);
   const slash = rest.indexOf('/');
   const sessionId = rest.slice(0, slash);
   const resource = rest.slice(slash + 1);

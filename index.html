@@ -53,15 +53,45 @@
     }
     log('Service worker ready', 'g');
 
-    // ─── 2. Load ffmpeg.wasm ───
-    status('Loading ffmpeg.wasm (~32 MB)...');
+    // ─── 2. Load ffmpeg.wasm (cached in Cache API after first download) ───
+    const CACHE_NAME = 'stupidplay-ffmpeg-v1';
+    async function cachedBlobURL(url, mimeType) {
+      const cache = await caches.open(CACHE_NAME);
+      let resp = await cache.match(url);
+      if (resp) {
+        log(`Cache hit: ${url.split('/').pop()}`, 'g');
+      } else {
+        const name = url.split('/').pop();
+        status(`Downloading ${name}...`);
+        const raw = await fetch(url);
+        const total = parseInt(raw.headers.get('content-length') || '0');
+        const reader = raw.body.getReader();
+        const chunks = [];
+        let loaded = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          loaded += value.length;
+          if (total) status(`Downloading ${name}... ${(loaded / 1048576).toFixed(1)}/${(total / 1048576).toFixed(1)} MB`);
+        }
+        const body = new Blob(chunks);
+        resp = new Response(body, { headers: { 'Content-Type': mimeType } });
+        await cache.put(url, resp.clone());
+        log(`Downloaded ${name} (${(loaded / 1048576).toFixed(1)} MB)`, 'g');
+      }
+      const blob = new Blob([await resp.arrayBuffer()], { type: mimeType });
+      return URL.createObjectURL(blob);
+    }
+
+    status('Loading ffmpeg.wasm...');
     const ffmpeg = new FFmpeg();
     const CDN = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm';
     await ffmpeg.load({
-      coreURL: await toBlobURL(`${CDN}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${CDN}/ffmpeg-core.wasm`, 'application/wasm'),
+      coreURL: await cachedBlobURL(`${CDN}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await cachedBlobURL(`${CDN}/ffmpeg-core.wasm`, 'application/wasm'),
     });
-    log('ffmpeg.wasm loaded', 'g');
+    log('ffmpeg.wasm loaded (cached for next time)', 'g');
     status('Ready — pick a video file');
 
     // ─── State ───
